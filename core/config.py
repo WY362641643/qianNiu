@@ -19,7 +19,7 @@ config = {
         # 浏览器启动器路径
         'driverPath': 'core/chromedriver.exe',
         # 最近三个月已经采集过的页码数
-        'paging_trimester': 13,
+        'paging_trimester': 0,
         # 最近三个月以外已经采集过的页码数
         'paging_trimester_except': 0,
         # 不采集的订单状态, 包含

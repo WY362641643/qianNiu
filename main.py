@@ -22,7 +22,6 @@ from selenium.webdriver.common.action_chains import ActionChains
 from seleniumwire import webdriver
 from selenium.webdriver.chrome.service import Service
 
-import cv2
 import re
 import json
 import redis
@@ -276,7 +275,8 @@ class BaseWebDriver:
             # 定义状态为开始采集订单
             self._state_ = SpiderMessage.Status.COLLECT
             # 获取最近三个月的订单
-            self.__get_data_lately_trimester__(**kwargs)
+            if self.__get_data_lately_trimester__(**kwargs):
+                self._spider_status_ = SpiderMessage.QNSpiderPoint.SHOP_FINISH
             # 获取三个月以外的订单
             # self.__get_data_lately_trimester_except__(**kwargs)
             # 查看是否采集完成
@@ -317,7 +317,7 @@ class BaseWebDriver:
                 # 获取订单数量
                 orderNumber = self.get_elements_inner_text(**self.getDataTag['orderNumber'])
                 # 获取创建时间
-                order_start_time = re.findall('订单号：(.*?)<', HTML, flags=re.S)
+                order_start_time = re.findall('创建时间：(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})<', HTML, flags=re.S)
                 orderIds = list(zip(orderId, orderStatus, order_start_time, orderPrice, orderNumber))
                 self.__writer_redis_queue__(*orderIds)
             print(f'获取近三个月的订单, 第{page}页')
@@ -327,7 +327,7 @@ class BaseWebDriver:
             else:
                 if order_start_time[-1] < self.end_data:
                     # 跳出循环, 超过三个月
-                    return
+                    return True
                 else:
                     # 点击更多
                     if self.is_element_exist(**self.getDataClickTag['morePages']):
@@ -335,11 +335,11 @@ class BaseWebDriver:
                         self.pageRefreshMax -= 1
                         if self.pageRefreshMax:
                             continue
-                        return
+                        return True
                     else:
                         # 没有更多页面了, 跳出循环
-                        return
-        self._spider_status_ = SpiderMessage.QNSpiderPoint.LATELY_TRIMESTER
+                        return True
+        # self._spider_status_ = SpiderMessage.QNSpiderPoint.LATELY_TRIMESTER
 
     def __get_data_lately_trimester_except__(self, **kwargs):
         """获取近三个月以外的订单"""
@@ -692,65 +692,6 @@ class BaseWebDriver:
                 logger.exception(e)
                 # TODO 滑块处理错误, 发送邮件, 通知运维人员
         else:
-            return False
-
-    def get_rid_of_sliding(self, **kwargs):
-        """处理滑块验证码"""
-        try:
-            # 读取出实际图片, 生成对象
-            bg_img = cv2.imread(kwargs.get('filename_bj'))  # 背景图片
-            tp_img = cv2.imread(kwargs.get('filename_slide'))  # 滑块图片
-            # 查找图片边缘
-            bg_edge = cv2.Canny(bg_img, 100, 200)
-            tp_edge = cv2.Canny(tp_img, 100, 200)
-            # 转换图片颜色
-            bg_pic = cv2.cvtColor(bg_edge, cv2.COLOR_GRAY2RGB)
-            tp_pic = cv2.cvtColor(tp_edge, cv2.COLOR_GRAY2RGB)
-
-            res = cv2.matchTemplate(bg_pic, tp_pic, cv2.TM_CCOEFF_NORMED)
-            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-
-            th, tw = tp_pic.shape[:2]
-            tl = max_loc
-            br = (tl[0] + tw, tl[1] + th)
-            # 配置 滑块识别出的图片路径
-            filename_slide = os.path.join(self.workspace_path, f'sliding-discern_img_{str(bson.ObjectId())}.png')
-            cv2.rectangle(bg_img, tl, br, (0, 0, 255), 2)
-            cv2.imwrite(filename_slide, bg_img)
-            img_distance = tl[0]  # 获取原始图片上的移动距离
-
-            # 配置鼠标对象, 进行点击选中, 拖动滑块
-            actions = ActionChains(self.driver, duration=1)
-            actions.w3c_actions.devices[0].DEFAULT_MOVE_DURATION = 50
-            bj = self.driver.find_element(**self.parse_element_condition(
-                **self.loginExceptionTag['slidingBlockVerificationBJ']))
-            # 找到滑块标签
-            ele = self.driver.find_element(**self.parse_element_condition(
-                **self.loginExceptionTag['slidingBlockVerificationSlide']))
-            bj_driver_width = bj.size.get('width')  # 获取浏览器上压缩后图片的宽度
-            bj_img_width = bg_pic.shape[1]  # 获取原始图片的实际宽度
-            driver_distance = (bj_driver_width / bj_img_width) * img_distance  # 计算出浏览器上标签的滑动距离=
-            action = actions.click_and_hold(ele)
-            # 鼠标左击滑块不松开  TODO 需要拆分移动距离更细致，移动时间更短，使移动更平滑
-            i, f = str(driver_distance).split('.')
-            # action.move_by_offset(int(i)//2, 0).perform()
-            for _ in range(int(i)):
-                action.move_by_offset(1, 0).perform()
-            action.pause(1).release().perform()
-            # 等待 加载小圆圈消失
-
-            # 查看是否存在 验证失败标签消失, 并等待标签消失
-            self.block_not_waiting(**self.loginExceptionTag['slidingBlockFailed'])
-            # 查看是否存在 验证通过标签消失, 并等待标签消失
-            self.block_not_waiting(**self.loginExceptionTag['slidingBlockFailed'])
-            if self.is_element_exist(**self.loginExceptionTag['slidingBlockNetworkError']):
-                # 网络故障, 点击刷新按钮
-                self.click_element(**self.loginExceptionTag['slidingBlockRefresh'])
-                return False
-            time.sleep(3)
-            return self.is_login_success_disposable(**kwargs)
-        except (StaleElementReferenceException, InvalidSelectorException) as e:
-            logger.exception(e)
             return False
 
     def manual_work(self, orderId=None, **kwargs):

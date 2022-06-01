@@ -59,7 +59,8 @@ class ResSpider():
                         # future1 = pool.submit(self.get_requests_data, **{
                         #     **dict(user=user), **json.loads(data)
                         # })
-                        self.get_requests_data(**{**dict(user=user), **json.loads(data)})
+                        if data:
+                            self.get_requests_data(**{**dict(user=user), **json.loads(data)})
                     except Exception as e:
                         logger.exception(e)
                 else:
@@ -199,7 +200,7 @@ class ResSpider():
                     logisticsNum = None
 
                 # 下单时间 唯一
-                order_start_time = self.get_order_start_time(*order_data.get('mainOrder')['orderInfo']['lines'])
+                # order_start_time = self.get_order_start_time(*order_data.get('mainOrder')['orderInfo']['lines'])
 
                 # # 循环获取多个商品
                 # for index, goods in enumerate(order_data.get('mainOrder')['subOrders']):
@@ -212,41 +213,42 @@ class ResSpider():
                 # 商品名称
                 title = order_data.get('mainOrder')['subOrders'][0]['itemInfo']['title']
                 # 商品数量
-                quantity = order_data.get('mainOrder')['subOrders'][0]['quantity']
+                # quantity = order_data.get('mainOrder')['subOrders'][0]['quantity']
                 # 成交价格
-                totalPrice = 0
-                for price in order_data['mainOrder']['totalPrice']:
-                    try:
-                        totalPrice += float(re.findall('\d+\.\d+', price['content'][0]['value'], flags=re.S)[0])
-                    except:
-                        pass
+                # totalPrice = 0
+                # for price in order_data['mainOrder']['totalPrice']:
+                #     try:
+                #         totalPrice += float(re.findall('\d+\.\d+', price['content'][0]['value'], flags=re.S)[0])
+                #     except:
+                #         pass
                 # 订单状态
-                tradeStatus = self.get_tradeStatus(*order_data['mainOrder']['subOrders'])
+                # tradeStatus = self.get_tradeStatus(*order_data['mainOrder']['subOrders'])
                 # 快递名称
                 logisticsName = order_data['tabs'][0]['content']['logisticsName']
                 text = [
                     # 客户名称 唯一
                     client_name,
-                    # 客户电话 唯一
-                    client_phone,
                     # 客户地址 唯一
                     client_address,
-                    # 下单时间 唯一
-                    order_start_time,
-                    # 订单号
-                    # kwargs.get('orderId')[0],
+                    # 客户电话 唯一
+                    client_phone,
                     # 商品名称
                     title,
-                    # 商品数量
-                    quantity,
                     # 成交价格
-                    str(totalPrice),
-                    # 快递单号 唯一
-                    logisticsNum,
+                    kwargs.get('orderId')[3],
+                    # 商品数量
+                    kwargs.get('orderId')[4],
                     # 订单状态
-                    tradeStatus,
+                    kwargs.get('orderId')[1],
                     # 快递名称
                     logisticsName,
+                    # 订单号
+                    # kwargs.get('orderId')[0],
+                    # str(totalPrice),
+                    # 快递单号 唯一
+                    logisticsNum,
+                    # 下单时间 唯一
+                    kwargs.get('orderId')[2],
                 ]
                 with open(kwargs.get('name'), "a", encoding="utf-8-sig", newline="") as f:
                     # 基于打开的文件，创建 csv.writer 实例
@@ -274,6 +276,6 @@ class ResSpider():
 if __name__ == '__main__':
     data = config['qianNiu']
     resSpider = ResSpider(**data)
-    resSpider.listen_orderId_queue('ali088602014831阿紫')
-    # resSpider.listen_broker_queue()
+    # resSpider.listen_orderId_queue('ali088602014831阿紫')
+    resSpider.listen_broker_queue()
     # resSpider.get_requests_data()
