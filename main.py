@@ -283,8 +283,6 @@ class BaseWebDriver:
             print('开始采集数据')
             # 跳转到 已卖出宝贝的地址
             self.driver.get(self.linkAll['outGoods'])
-            # 定义状态为开始采集订单
-            self._state_ = SpiderMessage.Status.COLLECT
             # 获取最近三个月的订单
             if self.__get_data_lately_trimester__(**kwargs):
                 self._spider_status_ = SpiderMessage.QNSpiderPoint.SHOP_FINISH
@@ -292,8 +290,12 @@ class BaseWebDriver:
             # self.__get_data_lately_trimester_except__(**kwargs)
             # 查看是否采集完成
             if self.__finish__():
-                print('采集成功')
-                return True
+                flag = input('已经采集完成, 直接点击回车关闭浏览器, 或者输入任意字符, 重新采集:')
+                if not flag:
+                    return True
+                else:
+                    self._spider_status_ = SpiderMessage.QNSpiderPoint.START
+                    self._state_ = SpiderMessage.Status.COLLECT
 
     def __get_data_lately_trimester__(self, **kwargs):
         """获取近三个月的订单"""
@@ -332,11 +334,14 @@ class BaseWebDriver:
                 orderIds = list(zip(orderId, orderStatus, order_start_time, orderPrice, orderNumber))
                 self.__writer_redis_queue__(*orderIds)
             print(f'获取近三个月的订单, 第{page}页')
+            # 等待redis队列中的数据量少于 self.push_number 的数量
+            self.__get_redis_queue_number__()
             # 判断下一页是否可点击
             if self.next_page(self.getDataClickTag['click_next_page']):
                 self.paging_trimester = page
             else:
                 if order_start_time[-1] < self.end_data:
+                    print('已经采集完成最近三个月的数据')
                     # 跳出循环, 超过三个月
                     return True
                 else:
@@ -407,6 +412,8 @@ class BaseWebDriver:
                 if not self.__send_account_pwd__():
                     print('输入账户密码页面失败')
                     continue
+                # 定义状态为开始采集订单
+                self._state_ = SpiderMessage.Status.COLLECT
                 # 3. 采集数据
                 if not self.__collect__():
                     print('采集数据失败')
