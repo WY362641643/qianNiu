@@ -69,8 +69,6 @@ class ResSpider():
                     except Exception as e:
                         logger.exception(e)
                 else:
-                    # 此管道已不再添加数据, 不再监听此管道, 并删除对应的 str-headers
-                    self.redis.delete('headers:' + str(user))
                     # 获取错误文件内的数据
                     with open(nameError, 'r', encoding='utf-8') as f:
                         error_child_data = f.read()
@@ -81,6 +79,8 @@ class ResSpider():
                     # 重新获取错误数据
                     for child_data in error_child_data:
                         self.get_requests_data(**{**dict(user=user), **eval(child_data)})
+                    # 此管道已不再添加数据, 不再监听此管道, 并删除对应的 str-headers
+                    self.redis.delete('headers:' + str(user))
                     # 关闭线程
                     sys.exit()
                 print('listening...')
