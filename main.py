@@ -163,8 +163,8 @@ class BaseWebDriver:
         self.redis.lpush('orderId:' + str(self.userName), *[json.dumps({
             'name': self.fileName,
             'nameError': self.fileNameError,
-            'orderId': orderId
-        }, ensure_ascii=False, indent=4) for orderId in args])
+            'child_data': child_data
+        }, ensure_ascii=False, indent=4) for child_data in args])
 
         # 更新请求头
         cookieds = self.driver.get_cookies()

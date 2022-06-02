@@ -13,6 +13,7 @@ import threading
 import time
 
 from core.config import *
+import sys
 
 
 class ResSpider():
@@ -24,6 +25,8 @@ class ResSpider():
 
     def listen_broker_queue(self, timeout=0):
         """监听 broker 队列中的数据"""
+        # 创建一个包含20条线程的线程池
+        pool = ThreadPoolExecutor(max_workers=20)
         while True:
             try:
                 user = self.redis.brpop('scrapy_broker_queue')
@@ -34,7 +37,10 @@ class ResSpider():
                         user = user[1]
                     try:
                         logger.info(f'Recv:{user}')
-                        self.callback(user)
+                        # 向线程池提交一个task, 50会作为action()函数的参数
+                        # 将发包任务添加进 进程池
+                        future1 = pool.submit(self.callback, **user)
+                        # self.callback(user)
                     except Exception as e:
                         logger.exception(e)
                 print('listening...')
@@ -43,31 +49,38 @@ class ResSpider():
 
     def listen_orderId_queue(self, user, timeout=0):
         """监听 orderId 队列中的数据"""
-        # 创建一个包含20条线程的线程池
-        pool = ThreadPoolExecutor(max_workers=20)
         while True:
             try:
-                data = self.redis.brpop('orderId:' + str(user))
-                if data:
-                    if isinstance(data[1], bytes):
-                        data = data[1].decode(encoding='utf-8')
+                child_data = self.redis.brpop('orderId:' + str(user))
+                if child_data:
+                    if isinstance(child_data[1], bytes):
+                        child_data = child_data[1].decode(encoding='utf-8')
                     else:
-                        data = data[1]
+                        child_data = child_data[1]
                     try:
-                        logger.info(f'Recv:{data}')
-                        # 向线程池提交一个task, 50会作为action()函数的参数
-                        # future1 = pool.submit(self.get_requests_data, **{
-                        #     **dict(user=user), **json.loads(data)
-                        # })
-                        if data:
-                            self.get_requests_data(**{**dict(user=user), **json.loads(data)})
+                        logger.info(f'Recv:{child_data}')
+                        # 获取错误文件路径
+                        if child_data:
+                            child_data = json.loads(child_data)
+                            nameError = child_data.get('nameError')
+                            self.get_requests_data(**{**dict(user=user), **child_data})
                     except Exception as e:
                         logger.exception(e)
                 else:
                     # 此管道已不再添加数据, 不再监听此管道, 并删除对应的 str-headers
                     self.redis.delete('headers:' + str(user))
-                    # 跳出监听
-                    break
+                    # 获取错误文件内的数据
+                    with open(nameError, 'r', encoding='utf-8') as f:
+                        error_child_data = f.read()
+                    # 将错误文件清零
+                    with open(nameError, 'w', encoding='utf-8') as f:
+                        f.write('')
+                    error_child_data = error_child_data.split('\n')
+                    # 重新获取错误数据
+                    for child_data in error_child_data:
+                        self.get_requests_data(**{**dict(user=user), **child_data})
+                    # 关闭线程
+                    sys.exit()
                 print('listening...')
             except Exception as e:
                 logger.exception(e)
@@ -95,7 +108,7 @@ class ResSpider():
 
     def get_taobao_requests_data(self, headers, **kwargs):
         """通过旧页面获取数据"""
-        url = self.linkAll['getDataUrlFormer'].format(orderId=kwargs.get('orderId')[0])
+        url = self.linkAll['getDataUrlFormer'].format(orderId=kwargs.get('child_data')[0])
         logger.info(url)
         res = requests.get(url, headers=headers)
         if res.status_code == 200:
@@ -136,8 +149,6 @@ class ResSpider():
                         client_address,
                         # 下单时间 唯一
                         order_start_time,
-                        # 订单号
-                        # kwargs.get('orderId')[0],
                         # 商品名称
                         title[index],
                         # 商品数量
@@ -164,22 +175,20 @@ class ResSpider():
                 #     f.write(HTML)
                 # logger.exception(e)
                 with open(kwargs.get('nameError'), 'a', encoding='utf-8') as f:
-                    f.write(kwargs.get('orderId')[0] + '\n')
+                    f.write(kwargs.get('child_data') + '\n')
         else:
             with open(kwargs.get('nameError'), 'a', encoding='utf-8') as f:
-                f.write(kwargs.get('orderId')[0] + '\n')
+                f.write(kwargs.get('child_data') + '\n')
 
     def get_requests_data(self, **kwargs):
         """通过 requests.get请求获取数据, 并存入文件中"""
-        # kwargs = {'user': '哥两好小玉屋远方', 'name': 'D:\\Desktop\\project\\qianNiu\\appData\\哥两好小玉屋远方-a12345678_spider.csv', 'nameError': 'D:\\Desktop\\project\\qianNiu\\appData\\哥两好小玉屋远方-a12345678_error.txt', 'orderId': ['1493187795987894', '退款成功']}
-
         headers = json.loads(self.redis.get('header:' + str(kwargs.get('user'))))
-        flag = re.findall(self.includeNoSpiderOrderStatus, kwargs.get('orderId')[1], flags=re.S)
+        flag = re.findall(self.includeNoSpiderOrderStatus, kwargs.get('child_data')[1], flags=re.S)
         if not flag:
-            logger.info('订单状态被过滤:',kwargs.get('orderId')[0])
+            logger.info('订单状态被过滤:', kwargs.get('child_data')[0])
             return
             # 轮询获取单个订单数据
-        res = requests.get(self.linkAll['getDataUrl'].format(orderId=kwargs.get('orderId')[0]), headers=headers)
+        res = requests.get(self.linkAll['getDataUrl'].format(orderId=kwargs.get('child_data')[0]), headers=headers)
         if res.status_code == 200:
             try:
                 order_data = res.json()
@@ -199,30 +208,9 @@ class ResSpider():
                 except:
                     logisticsNum = None
 
-                # 下单时间 唯一
-                # order_start_time = self.get_order_start_time(*order_data.get('mainOrder')['orderInfo']['lines'])
-
-                # # 循环获取多个商品
-                # for index, goods in enumerate(order_data.get('mainOrder')['subOrders']):
-                #     # 商品名称
-                #     title = goods['itemInfo']['title']
-                #     # 商品数量
-                #     quantity = goods['quantity']
-
                 # 只获取一个商品
                 # 商品名称
                 title = order_data.get('mainOrder')['subOrders'][0]['itemInfo']['title']
-                # 商品数量
-                # quantity = order_data.get('mainOrder')['subOrders'][0]['quantity']
-                # 成交价格
-                # totalPrice = 0
-                # for price in order_data['mainOrder']['totalPrice']:
-                #     try:
-                #         totalPrice += float(re.findall('\d+\.\d+', price['content'][0]['value'], flags=re.S)[0])
-                #     except:
-                #         pass
-                # 订单状态
-                # tradeStatus = self.get_tradeStatus(*order_data['mainOrder']['subOrders'])
                 # 快递名称
                 logisticsName = order_data['tabs'][0]['content']['logisticsName']
                 text = [
@@ -235,20 +223,17 @@ class ResSpider():
                     # 商品名称
                     title,
                     # 成交价格
-                    kwargs.get('orderId')[3],
+                    kwargs.get('child_data')[3],
                     # 商品数量
-                    kwargs.get('orderId')[4],
+                    kwargs.get('child_data')[4],
                     # 订单状态
-                    kwargs.get('orderId')[1],
+                    kwargs.get('child_data')[1],
                     # 快递名称
                     logisticsName,
-                    # 订单号
-                    # kwargs.get('orderId')[0],
-                    # str(totalPrice),
                     # 快递单号 唯一
                     logisticsNum,
                     # 下单时间 唯一
-                    kwargs.get('orderId')[2],
+                    kwargs.get('child_data')[2],
                 ]
                 with open(kwargs.get('name'), "a", encoding="utf-8-sig", newline="") as f:
                     # 基于打开的文件，创建 csv.writer 实例
@@ -263,10 +248,10 @@ class ResSpider():
             except Exception as e:
                 logger.exception(e)
                 with open(kwargs.get('nameError'), 'a', encoding='utf-8') as f:
-                    f.write(kwargs.get('orderId')[0] + '\n')
+                    f.write(str(kwargs.get('child_data')) + '\n')
         else:
             with open(kwargs.get('nameError'), 'a', encoding='utf-8') as f:
-                f.write(kwargs.get('orderId')[0] + '\n')
+                f.write(str(kwargs.get('child_data')) + '\n')
 
     def callback(self, user):
         """获取到 redis 主队列中数据, 启动采集"""
