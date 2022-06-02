@@ -450,20 +450,23 @@ class BaseWebDriver:
             return True
         except TimeoutException as e:
             # 标签阻塞等待检测失败
-            logger.exception(e)
+            logger.warning(e.msg)
             email_msg = dict(status=4041, subject='阻塞等待事件标签标签消失超时', content=f"阻塞等待事件标签标签消失超时, 标签内容: {kwargs}")
             self.__flush_msg_queue__(
                 errorlevel=SpiderMessage.ErrorLevel.__dict__['Critical'], msg=f"{email_msg.get('subject')}, 等待人工处理",
                 sattus=400, data=email_msg, **SpiderMessage.LoginInitFailed.__dict__
             )
             return False
-        except (ElementClickInterceptedException) as e:
-            logger.exception(e)
+        except ElementClickInterceptedException as e:
+            logger.warning(e.msg)
             email_msg = dict(status=4041, subject='阻塞等待事件标签标签消失错误', content=f"页面未检测到该标签, 标签内容: {kwargs}")
             self.__flush_msg_queue__(
                 errorlevel=SpiderMessage.ErrorLevel.__dict__['Critical'], msg=f"{email_msg.get('subject')}, 等待人工处理",
                 sattus=400, data=email_msg, **SpiderMessage.LoginInitFailed.__dict__
             )
+        except Exception as e:
+            logger.warning(e.args)
+            return False
 
     def is_element_exist(self, **kwargs):
         """
@@ -756,14 +759,13 @@ class BaseWebDriver:
             elif self._state_ != SpiderMessage.Status.LOGIN_VERIFY:
                 for itemTag in self.loginExceptionTag:
                     if self.is_element_exist(**itemTag):
-                        # TODO 程序暂停, 等待用户确认后继续执行
-                        print('出现风控验证, 请过滑块验证码')
-                        input('出现风控验证, 认证成功后请输入回车继续执行程序')
-                        print('已收到命令, 开始继续执行程序')
+                        print('出现风控验证, 请处理....')
+                        # input('出现风控验证, 认证成功后请输入回车继续执行程序')
+                        # print('已收到命令, 开始继续执行程序')
                         # self.driver.refresh()
                         self._state_ = SpiderMessage.Status.LOGIN_VERIFY
             time.sleep(1)
-            print('循环检测是否登录成功')
+            print('循环检测是否登录成功中...')
 
     def is_login_success_disposable(self, **kwargs):
         """用于一次性检测登陆是否成功, 主要用在登录成功后, 采集数据发生异常时"""
@@ -785,12 +787,15 @@ class BaseWebDriver:
         # clickExceptionClickTag = copy.deepcopy(self.clickExceptionClickTag)
         for except_tag in self.getDataVerify:
             if self.is_element_exist(**except_tag):
-                # 采集数据阶段出现二次验证码
-                # TODO 暂停程序, 等待用户确认后执行
-                input('采集数据中出现二次风控验证, 认证成功后请输入回车继续执行程序')
-                print('已收到命令, 开始继续执行程序')
-                self._state_ = SpiderMessage.Status.COllECT_VERIFY
-                pass
+                # 采集数据阶段出现二次验证码, 循环检测等待标签消失
+                while True:
+                    try:
+                        self.block_not_waiting(**except_tag)
+                    except:
+                        pass
+                    input('采集数据中出现二次风控验证, 认证成功后请输入回车继续执行程序....')
+                    self._state_ = SpiderMessage.Status.COllECT_VERIFY
+                    time.sleep(2)
 
         for except_tag in copy.deepcopy(self.clickExceptionClickTag):
             if self.is_element_exist(

@@ -160,9 +160,9 @@ class ResSpider():
                         # writer.writerows(data_list)
                     logger.info(f'Writer:{text}')
             except Exception as e:
-                with open('myTest/1.html', 'w', encoding='gb18030') as f:
-                    f.write(HTML)
-                logger.exception(e)
+                # with open('myTest/1.html', 'w', encoding='gb18030') as f:
+                #     f.write(HTML)
+                # logger.exception(e)
                 with open(kwargs.get('nameError'), 'a', encoding='utf-8') as f:
                     f.write(kwargs.get('orderId')[0] + '\n')
         else:
