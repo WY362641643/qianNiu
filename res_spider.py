@@ -137,7 +137,7 @@ class ResSpider():
                         # 下单时间 唯一
                         order_start_time,
                         # 订单号
-                        kwargs.get('orderId')[0],
+                        # kwargs.get('orderId')[0],
                         # 商品名称
                         title[index],
                         # 商品数量

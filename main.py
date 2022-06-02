@@ -1,4 +1,5 @@
-# -*- coding: UTF-8 -*-
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import requests
 from loguru import logger
 # from spider.core.message import SpiderMessage
@@ -95,7 +96,7 @@ class BaseWebDriver:
         if len(str(self.start_day)) < 2:
             self.start_day = '0' + str(self.start_day)
 
-        self.end_data = f'{self.start_year}-{self.start_month}-{self.start_day}'
+        self.end_data = f'{self.start_year}-{self.start_month}-{self.start_day} 00:00:00'
 
     def __setattr__(self, key, value):
         object.__setattr__(self, key, value)
@@ -173,6 +174,16 @@ class BaseWebDriver:
         self.headers['cookie'] = self.cookie
         self.redis.set('header:' + str(self.userName), json.dumps(self.headers, ensure_ascii=False, indent=4)
                        )
+
+    def __get_redis_queue_number__(self):
+        """获取管道中未采集的数量"""
+        number = 1000
+        while number > self.push_number:
+            try:
+                number = self.redis.llen('orderId:' + str(self.userName))
+            except Exception as e:
+                logger.exception(e)
+            time.sleep(1)
 
     def __finish__(self):
         """采集完成, 改变状态, 通知reids队列, 关闭浏览器"""
@@ -508,8 +519,9 @@ class BaseWebDriver:
         @return:
         """
         self.slide_page_bottom()
-        # 查看是否出现 能输入页面的input标签
-        if self.is_element_exist(**self.getDataClickTag['send_arriver_paging']):
+        # 查看是否出现 能输入页面的input标签 并且不存在 点击更多页面的标签
+        if self.is_element_exist(**self.getDataClickTag['send_arriver_paging']) and self.click_element(
+                **self.getDataClickTag['morePages']):
             # 输入跳转标签的值
             self.send_element(page_number, **self.getDataClickTag['send_arriver_paging'])
             # 点击跳转
@@ -656,7 +668,6 @@ class BaseWebDriver:
 
     def wrong_password(self, **kwargs):
         """检测是否密码错误"""
-        # TODO 获取错误内容, 推送给用户, broker注意提取消息data
         text = ''
         for err_tag in self.wrongPassword:
             if self.is_element_exist(**err_tag):
@@ -669,30 +680,6 @@ class BaseWebDriver:
             ))
             return True
         return False
-        # TODO 检测密码
-
-    def verification_sliding(self, **kwargs):
-        """检测是否出现滑块验证码"""
-        if self.is_element_exist(**kwargs):
-            # TODO 等待滑块图片加载成功, 添加等待标签, 等待超时需要点击刷新标签
-            time.sleep(1)
-            try:
-                filename = self.get_sliding_block_verify_code_path(**kwargs)
-                if self.get_rid_of_sliding(**filename):
-                    # 滑块验证码已处理
-                    self.pageRefreshNumber = 5
-                    return False
-                elif not self.pageRefreshNumber:
-                    # TODO 使用机器过滑块连续失败, 添加队列, 通知运维人员
-                    return None
-                else:
-                    self.pageRefreshNumber -= 1
-                    return self.verification_sliding(**kwargs)
-            except Exception as e:
-                logger.exception(e)
-                # TODO 滑块处理错误, 发送邮件, 通知运维人员
-        else:
-            return False
 
     def manual_work(self, orderId=None, **kwargs):
         """检测人工处理时的界面登录成功状态"""

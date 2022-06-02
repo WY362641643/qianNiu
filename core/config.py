@@ -22,6 +22,8 @@ config = {
         'paging_trimester': 0,
         # 最近三个月以外已经采集过的页码数
         'paging_trimester_except': 0,
+        # 设置redis队列中 最大 订单号存储量
+        'push_number':50,
         # 不采集的订单状态, 包含
         'includeNoSpiderOrderStatus': '(交易成功)|(卖家已发货)',
         # 设置超时
