@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import requests
 from loguru import logger
-# from spider.core.message import SpiderMessage
-# from com.core.utils import JsonEncoder
 from selenium import webdriver
 import copy
-import bson
 import time
 import os.path
-# from selenium import webdriver
-from selenium.webdriver import DesiredCapabilities
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -19,9 +13,9 @@ from selenium.common.exceptions import StaleElementReferenceException, InvalidSe
 from selenium.common.exceptions import WebDriverException, TimeoutException, ElementClickInterceptedException
 from selenium.common.exceptions import ElementNotInteractableException
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.action_chains import ActionChains
-from seleniumwire import webdriver
-from selenium.webdriver.chrome.service import Service
+# from selenium.webdriver.common.action_chains import ActionChains
+# from seleniumwire import webdriver
+# from selenium.webdriver.chrome.service import Service
 
 import re
 import json

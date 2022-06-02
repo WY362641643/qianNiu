@@ -39,8 +39,10 @@ class ResSpider():
                         logger.info(f'Recv:{user}')
                         # 向线程池提交一个task, 50会作为action()函数的参数
                         # 将发包任务添加进 进程池
-                        future1 = pool.submit(self.callback, **user)
-                        # self.callback(user)
+                        # 多线程
+                        # future1 = pool.submit(self.callback, **user)
+                        # 单线程采集
+                        self.callback(user)
                     except Exception as e:
                         logger.exception(e)
                 print('listening...')
@@ -78,7 +80,7 @@ class ResSpider():
                     error_child_data = error_child_data.split('\n')
                     # 重新获取错误数据
                     for child_data in error_child_data:
-                        self.get_requests_data(**{**dict(user=user), **child_data})
+                        self.get_requests_data(**{**dict(user=user), **eval(child_data)})
                     # 关闭线程
                     sys.exit()
                 print('listening...')
@@ -123,6 +125,9 @@ class ResSpider():
                 client_name = recipient_name[0]
                 # 客户电话 唯一
                 client_phone = recipient_name[1]
+                if '*' in client_phone:
+                    # 电话号码中含有 * 不采集此电话号码
+                    raise ValueError
                 # 客户地址 唯一
                 client_address = recipient_name[3]
                 # 成交价格 唯一
@@ -132,7 +137,6 @@ class ResSpider():
                 # 下单时间 唯一
                 order_start_time = re.search('class="trade-time">.*?(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*?<', HTML,
                                              flags=re.S).group(1)
-
                 # 商品名称
                 title = re.findall('<div class="desc">.*?<.*?><.*?>(.*?)<', HTML, flags=re.S)
                 # 订单状态
@@ -164,16 +168,10 @@ class ResSpider():
                         # 基于打开的文件，创建 csv.writer 实例
                         writer = csv.writer(f)
                         # 写入 header。
-                        # writerow() 一次只能写入一行。
                         writer.writerow(text)
                         # 写入数据。
-                        # writerows() 一次写入多行。
-                        # writer.writerows(data_list)
                     logger.info(f'Writer:{text}')
             except Exception as e:
-                # with open('myTest/1.html', 'w', encoding='gb18030') as f:
-                #     f.write(HTML)
-                # logger.exception(e)
                 with open(kwargs.get('nameError'), 'a', encoding='utf-8') as f:
                     f.write(kwargs.get('child_data') + '\n')
         else:
