@@ -200,6 +200,9 @@ class ResSpider():
                 client_name = recipient_name[0]
                 # 客户电话 唯一
                 client_phone = recipient_name[1]
+                if '*' in client_phone:
+                    # 电话号码中含有 * 不采集此电话号码
+                    raise ValueError
                 # 客户地址 唯一
                 client_address = recipient_name[2]
                 # 快递单号 唯一
@@ -207,8 +210,6 @@ class ResSpider():
                     logisticsNum = order_data['tabs'][0]['content']['logisticsNum']
                 except:
                     logisticsNum = None
-
-                # 只获取一个商品
                 # 商品名称
                 title = order_data.get('mainOrder')['subOrders'][0]['itemInfo']['title']
                 # 快递名称
@@ -238,12 +239,8 @@ class ResSpider():
                 with open(kwargs.get('name'), "a", encoding="utf-8-sig", newline="") as f:
                     # 基于打开的文件，创建 csv.writer 实例
                     writer = csv.writer(f)
-                    # 写入 header。
-                    # writerow() 一次只能写入一行。
                     writer.writerow(text)
-                    # 写入数据。
                     # writerows() 一次写入多行。
-                    # writer.writerows(data_list)
                 logger.info(f'Writer:{text}')
             except Exception as e:
                 logger.exception(e)
