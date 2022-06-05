@@ -187,8 +187,6 @@ class BaseWebDriver:
             self._state_ = SpiderMessage.Status.FINISH
             # 通知 redis 管道
             self.redis.lpush('orderId:' + str(self.userName), '')
-            # 关闭刘浏览器
-            self.driver.quit()
             self.__flush_msg_queue__(
                 **SpiderMessage.Finish.__dict__
             )
@@ -276,21 +274,27 @@ class BaseWebDriver:
         """执行数据采集的函数"""
         while self._state_ < SpiderMessage.Status.FINISH:
             print('开始采集数据')
-            # 跳转到 已卖出宝贝的地址
-            self.driver.get(self.linkAll['outGoods'])
-            # 获取最近三个月的订单
-            if self.__get_data_lately_trimester__(**kwargs):
-                self._spider_status_ = SpiderMessage.QNSpiderPoint.SHOP_FINISH
-            # 获取三个月以外的订单
-            # self.__get_data_lately_trimester_except__(**kwargs)
-            # 查看是否采集完成
-            if self.__finish__():
-                flag = input('已经采集完成, 直接点击回车关闭浏览器, 或者输入任意字符, 重新采集:')
-                if not flag:
-                    return True
-                else:
-                    self._spider_status_ = SpiderMessage.QNSpiderPoint.START
-                    self._state_ = SpiderMessage.Status.COLLECT
+            try:
+                # 跳转到 已卖出宝贝的地址
+                self.driver.get(self.linkAll['outGoods'])
+                # 获取最近三个月的订单
+                if self.__get_data_lately_trimester__(**kwargs):
+                    self._spider_status_ = SpiderMessage.QNSpiderPoint.SHOP_FINISH
+                # 获取三个月以外的订单
+                # self.__get_data_lately_trimester_except__(**kwargs)
+                # 查看是否采集完成
+                if self.__finish__():
+                    flag = input('已经采集完成, 直接点击回车关闭浏览器, 或者输入任意字符, 重新采集:')
+                    if not flag:
+                        # 关闭刘浏览器
+                        self.driver.quit()
+                        return True
+                    else:
+                        self._spider_status_ = SpiderMessage.QNSpiderPoint.START
+                        self._state_ = SpiderMessage.Status.COLLECT
+            except Exception as e:
+                logger.exception(e)
+                input('发生位置错误， 请联系开发人员')
 
     def __get_data_lately_trimester__(self, **kwargs):
         """获取近三个月的订单"""
@@ -298,12 +302,13 @@ class BaseWebDriver:
             # 此步骤已执行
             return
         # 点击交易和已卖出的宝贝
-        if self.is_element_exist(**self.getDataClickTag['clickCommodity']):
-            self.click_browser_page(self.getDataClickTag['clickCommodity'], self.getDataClickTag['clickSold'])
-        # 点击最近三个月订单
-        self.click_element(**self.getDataClickTag['clickLatelyTrimester'])
+        # if self.is_element_exist(**self.getDataClickTag['clickCommodity']):
+        #     self.click_browser_page(self.getDataClickTag['clickCommodity'], self.getDataClickTag['clickSold'])
+        # # 点击最近三个月订单
+        # self.click_element(**self.getDataClickTag['clickLatelyTrimester'])
         # 进入循环, 开始批量获取数据
         order_start_time = []
+        input('进入最近三个月订单页面后回车')
         while True:
             # 等待加载标签消失
             self.block_not_waiting(**self.getDataTagDoing['next_page_loading'])
@@ -331,13 +336,8 @@ class BaseWebDriver:
             print(f'获取近三个月的订单, 第{page}页')
             # 等待redis队列中的数据量少于 self.push_number 的数量
             self.__get_redis_queue_number__()
-            # 判断最后一条数据事件是否超过 3个月
-            if order_start_time[-1] < self.end_data:
-                print('已经采集完成最近三个月的数据')
-                # 跳出循环, 超过三个月
-                return True
             # 判断下一页是否可点击
-            elif self.next_page(self.getDataClickTag['click_next_page']):
+            if self.next_page(self.getDataClickTag['click_next_page']):
                 self.paging_trimester = page
             else:
                 if order_start_time[-1] < self.end_data:
@@ -408,10 +408,10 @@ class BaseWebDriver:
                 if not self.__get_login_page__():
                     print('打开登录页面失败')
                     continue
-                # 2. 输入账户密码
-                if not self.__send_account_pwd__():
-                    print('输入账户密码页面失败')
-                    continue
+                # # 2. 输入账户密码
+                # if not self.__send_account_pwd__():
+                #     print('输入账户密码页面失败')
+                #     continue
                 # 定义状态为开始采集订单
                 self._state_ = SpiderMessage.Status.COLLECT
                 # 3. 采集数据
@@ -481,8 +481,7 @@ class BaseWebDriver:
         """
         try:
             element = self.driver.find_element(**self.parse_element_condition(**kwargs))
-        except (ElementClickInterceptedException, NoSuchElementException, NoSuchWindowException) as e:
-            # logger.warning(e.msg)
+        except (ElementClickInterceptedException, NoSuchElementException) as e:
             return False
         else:
             # 没有发生异常，表示在页面中找到了该元素，返回True
@@ -833,8 +832,8 @@ class BaseWebDriver:
 if __name__ == '__main__':
     # user = 'ali088602014831:阿紫'
     # pwd = 'qiuyuan888'
-    user = 'ch00103822lb:运营'
-    pwd = '123456lb'
+    user = '个性臭臭:小法'
+    pwd = 'dingding888'
     data = config['qianNiu']
     BaseWebDriver(**{
         **dict(
