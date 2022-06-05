@@ -58,7 +58,7 @@ class ResSpider():
         while True:
             try:
                 child_data = self.redis.brpop('orderId:' + str(user))
-                if child_data:
+                if child_data[1] != '0':
                     if isinstance(child_data[1], bytes):
                         child_data = child_data[1].decode(encoding='utf-8')
                     else:
@@ -73,6 +73,7 @@ class ResSpider():
                     except Exception as e:
                         logger.exception(e)
                 else:
+                    nameError=r'C:\Users\Administrator\PycharmProjects\qianNiu\appData\个性臭臭小法-dingding888_error.txt'
                     # 获取错误文件内的数据
                     with open(nameError, 'r', encoding='utf-8') as f:
                         error_child_data = f.read()
