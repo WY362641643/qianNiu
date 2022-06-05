@@ -11,11 +11,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, ElementNotVisibleException
 from selenium.common.exceptions import StaleElementReferenceException, InvalidSelectorException
 from selenium.common.exceptions import WebDriverException, TimeoutException, ElementClickInterceptedException
-from selenium.common.exceptions import ElementNotInteractableException
+from selenium.common.exceptions import ElementNotInteractableException, NoSuchWindowException
 from selenium.webdriver.common.keys import Keys
 # from selenium.webdriver.common.action_chains import ActionChains
 # from seleniumwire import webdriver
-# from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.service import Service
 
 import re
 import json
@@ -131,10 +131,11 @@ class BaseWebDriver:
         # 消除特征 end ====
         chrome_options.add_argument('--ignore-certificate-errors')
         # 如果是需要带帐号密码验证的代理服务器 需要用chrome的插件解决（据说firefox的driver可以直接带参
+        s = Service(self.driverPath)
         self.driver = webdriver.Chrome(
             # desired_capabilities=caps,
             # desired_capabilities=desired_capabilities,
-            executable_path=self.driverPath,
+            service=s,
             options=chrome_options)  # 一切设置完之后，只要在启动driver时带上options就可以了
         # self.driver.maximize_window()
         # 消除 selenium 的标记特征  屏蔽webdriver特征  start ======
@@ -330,8 +331,13 @@ class BaseWebDriver:
             print(f'获取近三个月的订单, 第{page}页')
             # 等待redis队列中的数据量少于 self.push_number 的数量
             self.__get_redis_queue_number__()
+            # 判断最后一条数据事件是否超过 3个月
+            if order_start_time[-1] < self.end_data:
+                print('已经采集完成最近三个月的数据')
+                # 跳出循环, 超过三个月
+                return True
             # 判断下一页是否可点击
-            if self.next_page(self.getDataClickTag['click_next_page']):
+            elif self.next_page(self.getDataClickTag['click_next_page']):
                 self.paging_trimester = page
             else:
                 if order_start_time[-1] < self.end_data:
@@ -475,7 +481,8 @@ class BaseWebDriver:
         """
         try:
             element = self.driver.find_element(**self.parse_element_condition(**kwargs))
-        except (ElementClickInterceptedException, NoSuchElementException) as e:
+        except (ElementClickInterceptedException, NoSuchElementException, NoSuchWindowException) as e:
+            # logger.warning(e.msg)
             return False
         else:
             # 没有发生异常，表示在页面中找到了该元素，返回True
@@ -524,8 +531,7 @@ class BaseWebDriver:
         """
         self.slide_page_bottom()
         # 查看是否出现 能输入页面的input标签 并且不存在 点击更多页面的标签
-        if self.is_element_exist(**self.getDataClickTag['send_arriver_paging']) and self.click_element(
-                **self.getDataClickTag['morePages']):
+        if self.is_element_exist(**self.getDataClickTag['send_arriver_paging']):
             # 输入跳转标签的值
             self.send_element(page_number, **self.getDataClickTag['send_arriver_paging'])
             # 点击跳转
@@ -593,7 +599,7 @@ class BaseWebDriver:
             #  Message: no such element: Unable to locate element:
             logger.warning(e.msg)
             self.__get_data_click_exception_tag__(**kwargs)
-            raise NoSuchElementException(e.msg)
+            # raise NoSuchElementException(e.msg)
 
     def get_page_source(self):
         """获取对象的源代码"""
@@ -827,8 +833,8 @@ class BaseWebDriver:
 if __name__ == '__main__':
     # user = 'ali088602014831:阿紫'
     # pwd = 'qiuyuan888'
-    user = '刘梦林1995:5号'
-    pwd = 'a12345678'
+    user = 'ch00103822lb:运营'
+    pwd = '123456lb'
     data = config['qianNiu']
     BaseWebDriver(**{
         **dict(
