@@ -21,7 +21,11 @@ class ResSpider():
 
         for k, v in kwargs.items():
             object.__setattr__(self, k, v)
-        self.redis = redis.Redis(host='127.0.0.1', port=6379, db=0, decode_responses=True)
+        try:
+            self.redis = redis.Redis(host='127.0.0.1', port=6379, db=0, decode_responses=True)
+        except:
+            print('redis 服务未启动, 关闭程序')
+            exit()
 
     def listen_broker_queue(self, timeout=0):
         """监听 broker 队列中的数据"""
