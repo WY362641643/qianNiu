@@ -1,8 +1,8 @@
 /.idea/
 /Test/
 /venv/
-/slinky_com_settings.py
 test*
 *.json
 *.xlsx
 img/
+appData
