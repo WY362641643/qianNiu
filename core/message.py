@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 
 
+
 class SpiderMessageCode:
 
     def __init__(self, **kwargs):

@@ -16,6 +16,7 @@ from core.config import *
 import sys
 
 
+
 class ResSpider():
     def __init__(self, **kwargs):
 

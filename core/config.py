@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+
 config = {
     'qianNiu': {
         # 所有的链接存放地址

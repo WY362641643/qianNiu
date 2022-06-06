@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import csv
 
+
 with open(r'C:\Users\Administrator\Desktop\qianNiu\appData/ali088602014831阿紫-qiuyuan888_spider.csv', 'r',
           encoding='gb18030') as f:
     reads = csv.reader(f)
